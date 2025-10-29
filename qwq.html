@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقرير نهاية العمل الميداني</title>
+<style>
+  :root{
+    --nav:#003366;
+    --bg:#f6f7f9;
+    --paper:#ffffff;
+    --accent:#eaf4ff;
+  }
+  body{font-family: "Tajawal", "Noto Sans Arabic", sans-serif; margin:0; background:var(--bg);}
+  .container{max-width:900px; margin:14px auto; padding:12px;}
+  header{background:var(--nav); color:#fff; padding:12px 16px; border-radius:8px; text-align:center; font-weight:700; font-size:18px;}
+  .card{background:var(--paper); padding:12px; margin-top:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+  label{display:block; margin-bottom:6px; font-size:14px;}
+  input, select, textarea{width:100%; padding:8px; border:1px solid #d0d6db; border-radius:6px; box-sizing:border-box;}
+  button{background:var(--nav); color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; margin:4px;}
+  button.ghost{background:transparent; border:1px solid #d0d6db; color:#111;}
+  table{width:100%; border-collapse:collapse; margin-top:10px;}
+  th, td{border:1px solid #cfcfcf; padding:8px; text-align:center;}
+  th{background:#f0f4f8;}
+  tfoot td{font-weight:700;}
+  .vio-head{background:var(--nav); color:white;}
+  .vio-row{background:var(--accent);}
+  @media print{
+    body{background:white;}
+    .no-print{display:none;}
+    .container{max-width:100%; margin:0; padding:0;}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>تقرير نهاية العمل الميداني</header>
+
+  <!-- إعداد التقرير -->
+  <div class="card" id="setupCard">
+    <label>اسم المجموعة:</label>
+    <input id="groupName" type="text" placeholder="اكتب اسم المجموعة...">
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+      <div style="flex:1;"><label>اليوم</label><select id="h_day"></select></div>
+      <div style="flex:1;"><label>الشهر</label><select id="h_month"></select></div>
+      <div style="flex:1;"><label>السنة</label><select id="h_year"></select></div>
+    </div>
+    <button onclick="startReport()">ابدأ التقرير</button>
+  </div>
+
+  <!-- إدخال الموظفين -->
+  <div class="card" id="entryCard" style="display:none;">
+    <strong id="hdrGroup">مجموعة: -</strong><br>
+    <span id="hdrDate" class="muted">تاريخ: -</span>
+    <hr>
+    <label>اسم الموظف</label><input id="empName" type="text">
+    <label>عدد الحوادث</label><input id="empInc" type="number" min="0" value="0">
+    <label>عدد المخالفات</label><input id="empVio" type="number" min="0" value="0">
+    <div>
+      <button onclick="addEmployee()">أضف موظف</button>
+      <button onclick="showViolations()">الذهاب للمخالفات</button>
+      <button onclick="finishAndPrint()">أنهى وطباعة</button>
+    </div>
+    <table id="employeesTable">
+      <thead><tr><th>الرقم</th><th>الاسم</th><th>عدد الحوادث</th><th>عدد المخالفات</th></tr></thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr><td colspan="2">المجموع</td><td id="sumInc">0</td><td id="sumVio">0</td></tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- جدول المخالفات -->
+  <div class="card" id="violationsCard" style="display:none; margin-top:12px;">
+    <strong>تفاصيل المخالفات</strong>
+    <table>
+      <thead>
+        <tr><th class="vio-head">نوع المخالفة</th><th class="vio-head">العدد</th></tr>
+      </thead>
+      <tbody id="violationsList"></tbody>
+      <tfoot>
+        <tr><td>إجمالي عدد الحوادث</td><td id="sumIncVio">0</td></tr>
+        <tr><td>إجمالي عدد المخالفات</td><td id="sumVioVio">0</td></tr>
+      </tfoot>
+    </table>
+
+    <!-- حقل الملاحظات -->
+    <label>هل يوجد ملاحظات:</label>
+    <textarea id="notes" placeholder="اكتب الملاحظات هنا..." rows="3"></textarea>
+
+    <label>اسم قائد المجموعة</label><input id="leaderName" type="text">
+    <div>
+      <button onclick="backToEmployees()">رجوع لإضافة الموظفين</button>
+      <button onclick="finishAndPrint()">أنهى وطباعة</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // إعداد الهجري
+  const hDay=document.getElementById('h_day');
+  const hMonth=document.getElementById('h_month');
+  const hYear=document.getElementById('h_year');
+  for(let d=1;d<=30;d++){let o=document.createElement('option');o.value=d;o.textContent=d;hDay.appendChild(o);}
+  const months=['محرم','صفر','ربيع الأول','ربيع الآخر','جمادى الأولى','جمادى الآخرة','رجب','شعبان','رمضان','شوال','ذو القعدة','ذو الحجة'];
+  months.forEach((m,i)=>{let o=document.createElement('option'); o.value=i+1; o.textContent=m; hMonth.appendChild(o);});
+  for(let y=1440;y<=1458;y++){let o=document.createElement('option');o.value=y;o.textContent=y;hYear.appendChild(o);}
+
+  const violations=["الشاحنات والحافلات","لوحات غير عائدة للمركبة","اللوحات الأجنبية","ضبط الدراجات","قيادة المركبة بدون رخصة","استخدام السائق أي جهاز محمول بيده أثناء القيادة","التظليل","التفحيط","المخالفات المرتبطة بحوادث","تجاوز اكتاف","عدم توفر التجهيزات اللازمة","دبة صوت","عدم وجود لوحات","الشاحنات الخليجية","عدد المركبات المحجوزة"];
+  const vioTbody=document.getElementById('violationsList');
+  violations.forEach((v,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="${i==0?'vio-head':'vio-row'}">${v}</td><td><input type="number" value="0" min="0"></td>`;
+    vioTbody.appendChild(tr);
+  });
+
+  let employees=[];
+  const empTbody=document.querySelector('#employeesTable tbody');
+
+  function startReport(){
+    const g=document.getElementById('groupName').value.trim();
+    const d=hDay.value,m=hMonth.options[hMonth.selectedIndex].textContent,y=hYear.value;
+    if(!g||!d||!y){alert('يرجى إدخال اسم المجموعة والتاريخ');return;}
+    document.getElementById('hdrGroup').textContent='مجموعة: '+g;
+    document.getElementById('hdrDate').textContent='تاريخ: '+d+' / '+m+' / '+y;
+    document.getElementById('setupCard').style.display='none';
+    document.getElementById('entryCard').style.display='block';
+  }
+
+  function addEmployee(){
+    const name=document.getElementById('empName').value.trim();
+    const inc=parseInt(document.getElementById('empInc').value)||0;
+    const vio=parseInt(document.getElementById('empVio').value)||0;
+    if(!name){alert('يرجى إدخال اسم الموظف'); return;}
+    employees.push({name,inc,vio});
+    renderEmployees();
+    document.getElementById('empName').value=''; document.getElementById('empInc').value=0; document.getElementById('empVio').value=0;
+  }
+
+  function renderEmployees(){
+    empTbody.innerHTML='';
+    let sumInc=0,sumVio=0;
+    employees.forEach((e,i)=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${i+1}</td><td>${e.name}</td><td>${e.inc}</td><td>${e.vio}</td>`;
+      empTbody.appendChild(tr);
+      sumInc+=e.inc; sumVio+=e.vio;
+    });
+    document.getElementById('sumInc').textContent=sumInc;
+    document.getElementById('sumVio').textContent=sumVio;
+  }
+
+  function showViolations(){
+    document.getElementById('violationsCard').style.display='block';
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  function backToEmployees(){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  const sumIncVioTd=document.getElementById('sumIncVio');
+  const sumVioVioTd=document.getElementById('sumVioVio');
+
+  vioTbody.querySelectorAll('input').forEach(input=>{
+    input.addEventListener('input',updateViolationSums);
+  });
+
+  function updateViolationSums(){
+    let sumInc=0, sumVio=0;
+    violations.forEach((v,i)=>{
+      let val=parseInt(vioTbody.querySelectorAll('input')[i].value)||0;
+      if(i==0) sumInc+=val; // الشاحنات والحافلات -> حادث
+      else sumVio+=val;
+    });
+    sumIncVioTd.textContent=sumInc;
+    sumVioVioTd.textContent=sumVio;
+  }
+
+  function finishAndPrint(){
+    const g=document.getElementById('groupName').value.trim();
+    const d=hDay.value, m=hMonth.options[hMonth.selectedIndex].textContent, y=hYear.value;
+    const leader=document.getElementById('leaderName').value.trim();
+    const notes=document.getElementById('notes').value.trim();
+    const w=window.open('','_blank','width=900,height=700');
+    let html='<html><head><meta charset="UTF-8"><title>تقرير</title><style>table{width:100%;border-collapse:collapse;}th,td{border:1px solid #aaa;padding:6px;text-align:center;}th{background:#f0f4f8;} .vio-head{background:#003366;color:white;} .vio-row{background:#eaf4ff;}</style></head><body>';
+
+    // صفحة الموظفين
+    html+=`<div class="print-page"><div style="text-align:center;font-weight:700;font-size:20px;">تقرير نهاية العمل الميداني مجموعة ${g}</div><div style="text-align:center;margin-bottom:10px;">ليوم ${d} الموافق ${d} / ${m} / ${y}</div>`;
+    html+='<table><thead><tr><th>الرقم</th><th>الاسم</th><th>عدد الحوادث</th><th>عدد المخالفات</th></tr></thead><tbody>';
+    employees.forEach((e,i)=>{html+=`<tr><td>${i+1}</td><td>${e.name}</td><td>${e.inc}</td><td>${e.vio}</td></tr>`;});
+    html+=`</tbody><tfoot><tr><td colspan="2">المجموع</td><td>${employees.reduce((a,b)=>a+b.inc,0)}</td><td>${employees.reduce((a,b)=>a+b.vio,0)}</td></tr></tfoot></table></div>`;
+
+    // صفحة المخالفات
+    html+='<div class="print-page"><table><thead><tr><th class="vio-head">نوع المخالفة</th><th class="vio-head">العدد</th></tr></thead><tbody>';
+    const vioInputs=document.querySelectorAll('#violationsList input');
+    violations.forEach((v,i)=>{html+=`<tr class="${i>0?'vio-row':''}"><td>${v}</td><td>${vioInputs[i].value}</td></tr>`;});
+    html+=`</tbody><tfoot><tr><td>إجمالي عدد الحوادث</td><td>${sumIncVioTd.textContent}</td></tr><tr><td>إجمالي عدد المخالفات</td><td>${sumVioVioTd.textContent}</td></tr></tfoot>`;
+    
+    // إضافة الملاحظات واسم القائد
+    html+=`</table><br><strong>ملاحظات:</strong> ${notes}<br>`;
+    html+=`<br>اسم قائد المجموعة: ${leader}</div>`;
+    html+='</body></html>';
+    w.document.write(html);
+    w.document.close();
+    w.print();
+  }
+</script>
+</body>
+</html>
